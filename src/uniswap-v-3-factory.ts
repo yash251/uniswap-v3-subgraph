@@ -1,55 +1,34 @@
 import {
-  FeeAmountEnabled as FeeAmountEnabledEvent,
-  OwnerChanged as OwnerChangedEvent,
   PoolCreated as PoolCreatedEvent
 } from "../generated/UniswapV3Factory/UniswapV3Factory"
-import {
-  FeeAmountEnabled,
-  OwnerChanged,
-  PoolCreated
-} from "../generated/schema"
-
-export function handleFeeAmountEnabled(event: FeeAmountEnabledEvent): void {
-  let entity = new FeeAmountEnabled(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.fee = event.params.fee
-  entity.tickSpacing = event.params.tickSpacing
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleOwnerChanged(event: OwnerChangedEvent): void {
-  let entity = new OwnerChanged(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.oldOwner = event.params.oldOwner
-  entity.newOwner = event.params.newOwner
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
+import { Pool, Token } from "../generated/schema"
+import { getTokenName, getTokenSymbol } from "./tokenUtils"
+import { BigInt } from "@graphprotocol/graph-ts"
 
 export function handlePoolCreated(event: PoolCreatedEvent): void {
-  let entity = new PoolCreated(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.token0 = event.params.token0
-  entity.token1 = event.params.token1
-  entity.fee = event.params.fee
-  entity.tickSpacing = event.params.tickSpacing
-  entity.pool = event.params.pool
+  let token0 = Token.load(event.params.token0.toHexString())
+  let token1 = Token.load(event.params.token1.toHexString())
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
+  if (token0 === null) {
+    token0 = new Token(event.params.token0.toHexString())
+    token0.name = getTokenName(event.params.token0)
+    token0.symbol = getTokenSymbol(event.params.token0)
+  }
 
-  entity.save()
+  if (token1 === null) {
+    token1 = new Token(event.params.token1.toHexString())
+    token1.name = getTokenName(event.params.token1)
+    token1.symbol = getTokenSymbol(event.params.token1)
+  }
+
+  let pool = new Pool(event.params.pool.toHexString()) as Pool
+  pool.token0 = token0.id
+  pool.token1 = token1.id
+  pool.timestamp = event.block.timestamp
+  pool.blockNumber = event.block.number
+  pool.feeAmount = BigInt.fromI32(event.params.fee)
+
+  token0.save()
+  token1.save()
+  pool.save()
 }
